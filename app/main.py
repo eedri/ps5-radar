@@ -155,6 +155,17 @@ def create_app(db_path: str | None = None) -> FastAPI:
         await run_weekly_job(db)
         return JSONResponse({"ok": True, "message": "Refresh complete"})
 
+    @app.post("/admin/upload-db")
+    async def upload_db(request: Request):
+        from fastapi import HTTPException, UploadFile, File
+        secret = os.environ.get("ADMIN_SECRET", "")
+        if secret and request.headers.get("X-Admin-Secret") != secret:
+            raise HTTPException(status_code=403, detail="Forbidden")
+        body = await request.body()
+        with open(db, "wb") as f:
+            f.write(body)
+        return JSONResponse({"ok": True, "bytes": len(body)})
+
     return app
 
 
