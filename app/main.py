@@ -1,0 +1,190 @@
+import os
+import sqlite3
+import logging
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, Form, Request
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
+
+from app.database import (
+    init_db, get_all_games, get_new_games, get_library,
+    set_user_status, remove_user_status, add_liked_game, remove_liked_game,
+    get_liked_games, update_all_scores,
+)
+from app.scorer import build_tag_weights, rescore_all
+from app.scraper import search_rawg_game, fetch_game_tags
+from app.scheduler import start_scheduler, run_weekly_job
+
+log = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
+
+_DB_INIT_SCRIPT = """
+    CREATE TABLE IF NOT EXISTS games (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        cover_url TEXT,
+        genres TEXT DEFAULT '[]',
+        tags TEXT DEFAULT '[]',
+        perspective TEXT DEFAULT 'unknown',
+        rawg_rating REAL DEFAULT 0,
+        metacritic INTEGER,
+        psn_price_eur REAL,
+        psn_url TEXT,
+        ign_url TEXT,
+        match_score INTEGER DEFAULT 0,
+        first_seen DATE,
+        last_updated DATE
+    );
+
+    CREATE TABLE IF NOT EXISTS user_library (
+        game_id TEXT PRIMARY KEY,
+        status TEXT NOT NULL CHECK(status IN ('played', 'wishlist')),
+        added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        notes TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS liked_games (
+        rawg_id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        cover_url TEXT,
+        tags TEXT DEFAULT '[]',
+        added_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS email_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sent_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        games_count INTEGER,
+        top_game_id TEXT,
+        status TEXT DEFAULT 'ok'
+    );
+"""
+
+
+def _init_db_sync(db_path: str) -> None:
+    """Initialize the database synchronously using sqlite3."""
+    with sqlite3.connect(db_path) as conn:
+        conn.executescript(_DB_INIT_SCRIPT)
+        conn.commit()
+
+
+def create_app(db_path: str | None = None) -> FastAPI:
+    db = db_path or os.environ.get("DATABASE_URL", "/data/radar.db")
+
+    # In test mode (db_path provided), initialize DB synchronously so it's
+    # ready before the first request, regardless of lifespan event support.
+    if db_path is not None:
+        _init_db_sync(db)
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        await init_db(db)
+        if db_path is None:  # only start scheduler in production
+            start_scheduler(db)
+        yield
+
+    app = FastAPI(lifespan=lifespan)
+
+    static_dir = os.path.join(os.path.dirname(BASE_DIR), "static")
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+    # ── Pages ──────────────────────────────────────────────────────────────
+
+    @app.get("/", response_class=HTMLResponse)
+    async def index(request: Request):
+        games = await get_all_games(db, exclude_played=True)
+        games = [g for g in games if g["match_score"] >= 20]
+        return templates.TemplateResponse("index.html", {"request": request, "games": games, "selected_genre": "All"})
+
+    @app.get("/new", response_class=HTMLResponse)
+    async def new_games(request: Request):
+        games = await get_new_games(db, days=7)
+        return templates.TemplateResponse("new.html", {"request": request, "games": games})
+
+    @app.get("/library", response_class=HTMLResponse)
+    async def library(request: Request):
+        data = await get_library(db)
+        return templates.TemplateResponse("library.html", {
+            "request": request,
+            "played": data["played"],
+            "wishlist": data["wishlist"],
+        })
+
+    @app.get("/preferences", response_class=HTMLResponse)
+    async def preferences(request: Request):
+        liked = await get_liked_games(db)
+        weights = build_tag_weights(liked) if liked else {}
+        return templates.TemplateResponse("preferences.html", {
+            "request": request,
+            "liked_games": liked,
+            "tag_weights": weights,
+        })
+
+    # ── Library actions ────────────────────────────────────────────────────
+
+    @app.post("/library/set")
+    async def set_status(game_id: str = Form(...), status: str = Form(...)):
+        await set_user_status(db, game_id, status)
+        return RedirectResponse("/", status_code=303)
+
+    @app.post("/library/remove")
+    async def remove_status(game_id: str = Form(...)):
+        await remove_user_status(db, game_id)
+        return RedirectResponse("/library", status_code=303)
+
+    # ── Preferences actions ────────────────────────────────────────────────
+
+    @app.get("/preferences/search")
+    async def search_games(q: str):
+        api_key = os.environ.get("RAWG_API_KEY", "")
+        results = await search_rawg_game(api_key, q)
+        return JSONResponse(results)
+
+    class AddGameRequest(BaseModel):
+        rawg_id: str
+        title: str
+        cover_url: str = ""
+
+    @app.post("/preferences/add")
+    async def add_liked(body: AddGameRequest):
+        api_key = os.environ.get("RAWG_API_KEY", "")
+        tags = await fetch_game_tags(api_key, body.rawg_id)
+        liked = {
+            "rawg_id": body.rawg_id,
+            "title": body.title,
+            "cover_url": body.cover_url,
+            "tags": tags,
+        }
+        await add_liked_game(db, liked)
+        # Re-score all games
+        all_games = await get_all_games(db)
+        liked_games = await get_liked_games(db)
+        scores = rescore_all(all_games, liked_games)
+        await update_all_scores(db, scores)
+        return JSONResponse({"ok": True})
+
+    @app.post("/preferences/remove")
+    async def remove_liked(rawg_id: str = Form(...)):
+        await remove_liked_game(db, rawg_id)
+        all_games = await get_all_games(db)
+        liked_games = await get_liked_games(db)
+        scores = rescore_all(all_games, liked_games)
+        await update_all_scores(db, scores)
+        return RedirectResponse("/preferences", status_code=303)
+
+    # ── Admin ──────────────────────────────────────────────────────────────
+
+    @app.post("/admin/refresh")
+    async def manual_refresh():
+        await run_weekly_job(db)
+        return JSONResponse({"ok": True, "message": "Refresh complete"})
+
+    return app
+
+
+app = create_app()
