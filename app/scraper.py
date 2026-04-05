@@ -4,8 +4,6 @@ from bs4 import BeautifulSoup
 from typing import Optional
 
 RAWG_BASE = "https://api.rawg.io/api"
-PSN_SEARCH = "https://store.playstation.com/en-gb/search/{slug}"
-
 
 async def fetch_ps5_games(api_key: str, page_size: int = 40, pages: int = 5) -> list[dict]:
     """Fetch PS5 games from RAWG, newest first. Returns normalized game dicts."""
@@ -95,6 +93,9 @@ async def get_psn_price(psn_url: str) -> Optional[float]:
 
 
 def build_psn_url(slug: str) -> str:
+    # Note: RAWG slugs (e.g. "god-of-war") are not PSN product IDs.
+    # PSN Store product IDs look like "EP9000-PPSA01649_00-...".
+    # This URL will likely return a 404; get_psn_price() handles this gracefully.
     return f"https://store.playstation.com/en-gb/product/{slug}"
 
 

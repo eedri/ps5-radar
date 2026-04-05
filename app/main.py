@@ -1,5 +1,4 @@
 import os
-import asyncio
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Form, Request
@@ -72,6 +71,9 @@ def create_app(db_path: str | None = None) -> FastAPI:
 
     @app.post("/library/set")
     async def set_status(game_id: str = Form(...), status: str = Form(...)):
+        if status not in ("played", "wishlist"):
+            from fastapi import HTTPException
+            raise HTTPException(status_code=422, detail="status must be 'played' or 'wishlist'")
         await set_user_status(db, game_id, status)
         return RedirectResponse("/", status_code=303)
 
@@ -123,7 +125,11 @@ def create_app(db_path: str | None = None) -> FastAPI:
     # ── Admin ──────────────────────────────────────────────────────────────
 
     @app.post("/admin/refresh")
-    async def manual_refresh():
+    async def manual_refresh(request: Request):
+        secret = os.environ.get("ADMIN_SECRET", "")
+        if secret and request.headers.get("X-Admin-Secret") != secret:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=403, detail="Forbidden")
         await run_weekly_job(db)
         return JSONResponse({"ok": True, "message": "Refresh complete"})
 

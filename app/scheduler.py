@@ -1,6 +1,6 @@
 import os
 import logging
-from datetime import date, timedelta
+from datetime import date
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 

@@ -1,9 +1,12 @@
+import logging
 import resend
 from datetime import date
 from typing import Optional
 
+log = logging.getLogger(__name__)
+
 def build_email_html(games: list[dict], new_game_ids: set[str]) -> str:
-    today = date.today().strftime("%-d %b %Y")
+    today = f"{date.today().day} {date.today().strftime('%b %Y')}"
     new_titles = [g["title"] for g in games if g["id"] in new_game_ids]
     new_banner = ""
     if new_titles:
@@ -77,7 +80,7 @@ async def send_digest(
     """Send weekly digest email. Returns True on success."""
     resend.api_key = api_key
     html = build_email_html(games, new_game_ids)
-    today = date.today().strftime("%-d %b %Y")
+    today = f"{date.today().day} {date.today().strftime('%b %Y')}"
     try:
         resend.Emails.send({
             "from": from_email,
@@ -86,5 +89,6 @@ async def send_digest(
             "html": html,
         })
         return True
-    except Exception:
+    except Exception as e:
+        log.error(f"Failed to send email digest: {e}")
         return False
