@@ -34,7 +34,14 @@
           <span class="game-card__title">{{ g.title }}</span>
           <span class="badge {{ badge_class }}">{{ score }}</span>
         </div>
-        <div class="game-card__genres">{{ g.genres|join(', ')|title }}</div>
+        <div class="game-card__genres">
+          {{ g.genres|join(', ')|title }}
+          {% if 'third-person' in g.tags or '3rd-person-perspective' in g.tags or 'third-person-shooter' in g.tags %}
+            <span class="pov-label pov-label--3p">3P</span>
+          {% elif 'first-person' in g.tags or 'fps' in g.tags %}
+            <span class="pov-label pov-label--1p">1P</span>
+          {% endif %}
+        </div>
         <div class="game-card__meta">
           <span>⭐ {{ "%.1f"|format(g.rawg_rating) }}</span>
           {% if g.metacritic %}<span>MC {{ g.metacritic }}</span>{% endif %}
