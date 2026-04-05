@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}PS5 Radar — Preferences{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Preferences</h1>
+  <p>Add games you love — the radar scores future games against your taste</p>
+</div>
+
+<div style="position:relative">
+  <div class="pref-search">
+    <input type="text" id="search-input" placeholder="Search for a game you loved..." autocomplete="off">
+    <button class="btn btn--primary" onclick="searchGames()">Search</button>
+  </div>
+  <div class="search-results" id="search-results" style="display:none"></div>
+</div>
+
+<h3 style="margin-bottom:0.75rem;font-size:1rem;color:var(--text-muted)">Liked Games ({{ liked_games|length }})</h3>
+<div class="liked-list">
+  {% for g in liked_games %}
+  <div class="liked-item">
+    {% if g.cover_url %}<img class="liked-item__cover" src="{{ g.cover_url }}" alt="{{ g.title }}">
+    {% else %}<div class="liked-item__cover"></div>{% endif %}
+    <div class="liked-item__info">
+      <div class="liked-item__title">{{ g.title }}</div>
+      <div class="liked-item__tags">{{ g.tags|join(', ') }}</div>
+    </div>
+    <form method="post" action="/preferences/remove">
+      <input type="hidden" name="rawg_id" value="{{ g.rawg_id }}">
+      <button class="btn btn--red" type="submit">Remove</button>
+    </form>
+  </div>
+  {% endfor %}
+</div>
+
+{% if tag_weights %}
+<h3 style="margin:1.5rem 0 0.75rem;font-size:1rem;color:var(--text-muted)">Derived Tag Weights</h3>
+<div class="tag-weights">
+  {% for tag, weight in tag_weights|dictsort(by='value', reverse=true) %}
+  <div class="tag-weight">
+    <span>{{ tag }}</span>
+    <div class="tag-weight__bar" style="width:{{ [weight * 4, 80]|min }}px"></div>
+    <span style="color:var(--text-dim);font-size:0.65rem">+{{ "%.0f"|format(weight) }}</span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<script>
+async function searchGames() {
+  const q = document.getElementById('search-input').value.trim();
+  if (!q) return;
+  const resp = await fetch(`/preferences/search?q=${encodeURIComponent(q)}`);
+  const results = await resp.json();
+  const container = document.getElementById('search-results');
+  if (!results.length) { container.style.display = 'none'; return; }
+  container.innerHTML = results.map(r => `
+    <div class="search-result-item" onclick="addGame('${r.rawg_id}', '${r.title.replace(/'/g,"\\'")}', '${r.cover_url}')">
+      ${r.cover_url ? `<img src="${r.cover_url}" alt="">` : '<div style="width:36px;height:36px;background:var(--surface2);border-radius:4px"></div>'}
+      <span>${r.title}</span>
+    </div>`).join('');
+  container.style.display = 'block';
+}
+async function addGame(rawgId, title, coverUrl) {
+  await fetch('/preferences/add', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({rawg_id: rawgId, title: title, cover_url: coverUrl})});
+  document.getElementById('search-results').style.display = 'none';
+  location.reload();
+}
+document.getElementById('search-input').addEventListener('keydown', e => { if (e.key === 'Enter') searchGames(); });
+document.addEventListener('click', e => {
+  if (!e.target.closest('#search-input') && !e.target.closest('#search-results'))
+    document.getElementById('search-results').style.display = 'none';
+});
+</script>
+{% endblock %}

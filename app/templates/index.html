@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}PS5 Radar — Recommendations{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>PS5 Game Radar</h1>
+  <p>{{ games|length }} recommendations · sorted by match score</p>
+</div>
+
+<div class="filter-bar">
+  {% for genre in ["All", "Action", "Adventure", "RPG", "Open World", "Narrative", "Stealth"] %}
+    <button class="chip {% if selected_genre == genre %}active{% endif %}"
+            onclick="filterGenre('{{ genre }}')">{{ genre }}</button>
+  {% endfor %}
+  <select class="sort-select" onchange="sortGames(this.value)">
+    <option value="score">Match Score</option>
+    <option value="rating">Rating</option>
+    <option value="price">Price</option>
+  </select>
+</div>
+
+{% if games %}
+  <div class="card-grid" id="game-grid">
+    {% for g in games %}
+    {% set score = g.match_score %}
+    {% set badge_class = "badge--green" if score >= 80 else "badge--indigo" if score >= 60 else "badge--gray" %}
+    <div class="game-card" data-genres="{{ g.genres|join(',') }}" data-score="{{ score }}" data-rating="{{ g.rawg_rating }}" data-price="{{ g.psn_price_eur or 999 }}">
+      {% if g.cover_url %}
+        <img class="game-card__cover" src="{{ g.cover_url }}" alt="{{ g.title }}" loading="lazy">
+      {% else %}
+        <div class="game-card__cover"></div>
+      {% endif %}
+      <div class="game-card__body">
+        <div class="game-card__header">
+          <span class="game-card__title">{{ g.title }}</span>
+          <span class="badge {{ badge_class }}">{{ score }}</span>
+        </div>
+        <div class="game-card__genres">{{ g.genres|join(', ')|title }}</div>
+        <div class="game-card__meta">
+          <span>⭐ {{ "%.1f"|format(g.rawg_rating) }}</span>
+          {% if g.metacritic %}<span>MC {{ g.metacritic }}</span>{% endif %}
+          <span class="game-card__price">
+            {% if g.psn_price_eur %}€{{ "%.2f"|format(g.psn_price_eur) }}{% else %}—{% endif %}
+          </span>
+        </div>
+        <div class="game-card__links">
+          {% if g.ign_url %}<a href="{{ g.ign_url }}" class="btn btn--primary" target="_blank">IGN →</a>{% endif %}
+          {% if g.psn_url %}<a href="{{ g.psn_url }}" class="btn btn--surface" target="_blank">PSN →</a>{% endif %}
+        </div>
+        <div class="game-card__actions">
+          <form method="post" action="/library/set" style="display:inline">
+            <input type="hidden" name="game_id" value="{{ g.id }}">
+            <input type="hidden" name="status" value="played">
+            <button class="btn btn--red" type="submit">✓ Played</button>
+          </form>
+          <form method="post" action="/library/set" style="display:inline">
+            <input type="hidden" name="game_id" value="{{ g.id }}">
+            <input type="hidden" name="status" value="wishlist">
+            <button class="btn btn--green" type="submit">+ Wishlist</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="empty">
+    <h3>No recommendations yet</h3>
+    <p>Trigger a refresh via <code>POST /admin/refresh</code> to fetch games.</p>
+  </div>
+{% endif %}
+
+<script>
+function filterGenre(genre) {
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  event.target.classList.add('active');
+  document.querySelectorAll('.game-card').forEach(card => {
+    if (genre === 'All') { card.style.display = ''; return; }
+    const genres = card.dataset.genres.toLowerCase();
+    card.style.display = genres.includes(genre.toLowerCase()) ? '' : 'none';
+  });
+}
+function sortGames(by) {
+  const grid = document.getElementById('game-grid');
+  const cards = [...grid.querySelectorAll('.game-card')];
+  cards.sort((a, b) => {
+    if (by === 'score') return b.dataset.score - a.dataset.score;
+    if (by === 'rating') return b.dataset.rating - a.dataset.rating;
+    if (by === 'price') return a.dataset.price - b.dataset.price;
+  });
+  cards.forEach(c => grid.appendChild(c));
+}
+</script>
+{% endblock %}

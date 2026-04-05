@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}PS5 Radar — Library{% endblock %}
+{% block content %}
+<div class="page-header"><h1>My Library</h1></div>
+
+<div class="library-section">
+  <h2>Played ({{ played|length }})</h2>
+  {% if played %}
+  <div class="card-grid">
+    {% for g in played %}
+    <div class="game-card">
+      {% if g.cover_url %}<img class="game-card__cover" src="{{ g.cover_url }}" alt="{{ g.title }}" loading="lazy">
+      {% else %}<div class="game-card__cover"></div>{% endif %}
+      <div class="game-card__body">
+        <div class="game-card__header">
+          <span class="game-card__title">{{ g.title }}</span>
+          <span class="badge badge--gray">Played</span>
+        </div>
+        <div class="game-card__genres">{{ g.genres|join(', ')|title }}</div>
+        <div class="game-card__actions">
+          <form method="post" action="/library/remove">
+            <input type="hidden" name="game_id" value="{{ g.id }}">
+            <button class="btn btn--surface" type="submit">Remove</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}<div class="empty"><p>No played games yet.</p></div>{% endif %}
+</div>
+
+<div class="library-section">
+  <h2>Wishlist ({{ wishlist|length }})</h2>
+  {% if wishlist %}
+  <div class="card-grid">
+    {% for g in wishlist %}
+    <div class="game-card">
+      {% if g.cover_url %}<img class="game-card__cover" src="{{ g.cover_url }}" alt="{{ g.title }}" loading="lazy">
+      {% else %}<div class="game-card__cover"></div>{% endif %}
+      <div class="game-card__body">
+        <div class="game-card__header">
+          <span class="game-card__title">{{ g.title }}</span>
+          <span class="badge badge--indigo">Wishlist</span>
+        </div>
+        <div class="game-card__genres">{{ g.genres|join(', ')|title }}</div>
+        <div class="game-card__meta">
+          <span class="game-card__price">{% if g.psn_price_eur %}€{{ "%.2f"|format(g.psn_price_eur) }}{% else %}—{% endif %}</span>
+        </div>
+        <div class="game-card__links">
+          {% if g.psn_url %}<a href="{{ g.psn_url }}" class="btn btn--primary" target="_blank">Buy on PSN →</a>{% endif %}
+        </div>
+        <div class="game-card__actions">
+          <form method="post" action="/library/remove" style="display:inline">
+            <input type="hidden" name="game_id" value="{{ g.id }}">
+            <button class="btn btn--surface" type="submit">Remove</button>
+          </form>
+          <form method="post" action="/library/set" style="display:inline">
+            <input type="hidden" name="game_id" value="{{ g.id }}"><input type="hidden" name="status" value="played">
+            <button class="btn btn--red" type="submit">✓ Played</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}<div class="empty"><p>No wishlist games yet.</p></div>{% endif %}
+</div>
+{% endblock %}

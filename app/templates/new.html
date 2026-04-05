@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}PS5 Radar — New This Week{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>🆕 New This Week</h1>
+  <p>{{ games|length }} games added in the last 7 days</p>
+</div>
+
+{% if games %}
+  <div class="card-grid">
+    {% for g in games %}
+    {% set score = g.match_score %}
+    {% set badge_class = "badge--green" if score >= 80 else "badge--indigo" if score >= 60 else "badge--gray" %}
+    <div class="game-card">
+      {% if g.cover_url %}<img class="game-card__cover" src="{{ g.cover_url }}" alt="{{ g.title }}" loading="lazy">
+      {% else %}<div class="game-card__cover"></div>{% endif %}
+      <div class="game-card__body">
+        <div class="game-card__header">
+          <span class="game-card__title">{{ g.title }}</span>
+          <div style="display:flex;gap:0.3rem">
+            <span class="badge badge--new">NEW</span>
+            <span class="badge {{ badge_class }}">{{ score }}</span>
+          </div>
+        </div>
+        <div class="game-card__genres">{{ g.genres|join(', ')|title }}</div>
+        <div class="game-card__meta">
+          <span>⭐ {{ "%.1f"|format(g.rawg_rating) }}</span>
+          {% if g.metacritic %}<span>MC {{ g.metacritic }}</span>{% endif %}
+          <span class="game-card__price">{% if g.psn_price_eur %}€{{ "%.2f"|format(g.psn_price_eur) }}{% else %}—{% endif %}</span>
+        </div>
+        <div class="game-card__links">
+          {% if g.ign_url %}<a href="{{ g.ign_url }}" class="btn btn--primary" target="_blank">IGN →</a>{% endif %}
+          {% if g.psn_url %}<a href="{{ g.psn_url }}" class="btn btn--surface" target="_blank">PSN →</a>{% endif %}
+        </div>
+        <div class="game-card__actions">
+          <form method="post" action="/library/set" style="display:inline">
+            <input type="hidden" name="game_id" value="{{ g.id }}"><input type="hidden" name="status" value="played">
+            <button class="btn btn--red" type="submit">✓ Played</button>
+          </form>
+          <form method="post" action="/library/set" style="display:inline">
+            <input type="hidden" name="game_id" value="{{ g.id }}"><input type="hidden" name="status" value="wishlist">
+            <button class="btn btn--green" type="submit">+ Wishlist</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="empty"><h3>No new games this week</h3><p>Check back after the Sunday refresh.</p></div>
+{% endif %}
+{% endblock %}
