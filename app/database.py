@@ -143,6 +143,14 @@ async def remove_user_status(db_path: str, game_id: str) -> None:
         await conn.commit()
 
 
+async def get_game(db_path: str, game_id: str) -> Optional[dict]:
+    async with aiosqlite.connect(db_path) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute("SELECT * FROM games WHERE id = ?", (game_id,))
+        row = await cursor.fetchone()
+    return _row_to_dict(row) if row else None
+
+
 async def get_user_status(db_path: str, game_id: str) -> Optional[str]:
     async with aiosqlite.connect(db_path) as conn:
         cursor = await conn.execute(

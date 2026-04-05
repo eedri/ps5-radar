@@ -11,12 +11,12 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 from app.database import (
-    init_db, get_all_games, get_new_games, get_library,
+    init_db, get_all_games, get_new_games, get_library, get_game,
     set_user_status, remove_user_status, add_liked_game, remove_liked_game,
-    get_liked_games, update_all_scores,
+    get_liked_games, update_all_scores, get_user_status,
 )
 from app.scorer import build_tag_weights, rescore_all
-from app.scraper import search_rawg_game, fetch_game_tags
+from app.scraper import search_rawg_game, fetch_game_tags, fetch_game_detail
 from app.scheduler import start_scheduler, run_weekly_job
 
 log = logging.getLogger(__name__)
@@ -72,6 +72,21 @@ def create_app(db_path: str | None = None) -> FastAPI:
         return templates.TemplateResponse(request, "preferences.html", {
             "liked_games": liked,
             "tag_weights": weights,
+        })
+
+    @app.get("/game/{game_id}", response_class=HTMLResponse)
+    async def game_detail(request: Request, game_id: str):
+        from fastapi import HTTPException
+        game = await get_game(db, game_id)
+        if not game:
+            raise HTTPException(status_code=404, detail="Game not found")
+        api_key = os.environ.get("RAWG_API_KEY", "")
+        detail = await fetch_game_detail(api_key, game_id)
+        user_status = await get_user_status(db, game_id)
+        return templates.TemplateResponse(request, "game.html", {
+            "game": game,
+            "detail": detail,
+            "user_status": user_status,
         })
 
     # ── Library actions ────────────────────────────────────────────────────

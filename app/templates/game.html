@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}{{ game.title }} — PS5 Radar{% endblock %}
+{% block content %}
+
+{% set score = game.match_score %}
+{% set badge_class = "badge--green" if score >= 80 else "badge--indigo" if score >= 60 else "badge--gray" %}
+
+<div class="detail-hero" {% if game.cover_url %}style="--hero-img: url('{{ game.cover_url }}')"{% endif %}>
+  {% if game.cover_url %}
+    <img class="detail-cover" src="{{ game.cover_url }}" alt="{{ game.title }}">
+  {% endif %}
+  <div class="detail-hero__info">
+    <a href="/" class="back-link">← Back</a>
+    <h1 class="detail-title">{{ game.title }}</h1>
+    <div class="detail-badges">
+      <span class="badge {{ badge_class }}">Match {{ score }}</span>
+      {% if 'third-person' in game.tags or '3rd-person-perspective' in game.tags or 'third-person-shooter' in game.tags %}
+        <span class="pov-label pov-label--3p">3P</span>
+      {% elif 'first-person' in game.tags or 'fps' in game.tags %}
+        <span class="pov-label pov-label--1p">1P</span>
+      {% endif %}
+      {% if detail.esrb %}<span class="esrb-label">{{ detail.esrb }}</span>{% endif %}
+    </div>
+    <div class="detail-meta">
+      <span>⭐ {{ "%.1f"|format(game.rawg_rating) }} RAWG</span>
+      {% if game.metacritic %}<span>🎯 {{ game.metacritic }} Metacritic</span>{% endif %}
+      {% if detail.playtime %}<span>⏱ ~{{ detail.playtime }}h</span>{% endif %}
+      {% if detail.released %}<span>📅 {{ detail.released }}</span>{% endif %}
+    </div>
+    {% if game.genres %}
+      <div class="detail-genres">{{ game.genres|join(' · ')|title }}</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="detail-body">
+
+  <div class="detail-main">
+
+    {% if detail.trailer_url %}
+    <section class="detail-section">
+      <h2>Trailer</h2>
+      <video class="detail-trailer" controls preload="none" poster="{{ game.cover_url }}">
+        <source src="{{ detail.trailer_url }}">
+      </video>
+    </section>
+    {% endif %}
+
+    {% if detail.description %}
+    <section class="detail-section">
+      <h2>About</h2>
+      <p class="detail-desc">{{ detail.description[:800] }}{% if detail.description|length > 800 %}…{% endif %}</p>
+    </section>
+    {% endif %}
+
+    {% if detail.screenshots %}
+    <section class="detail-section">
+      <h2>Screenshots</h2>
+      <div class="detail-screenshots">
+        {% for img in detail.screenshots %}
+          <img src="{{ img }}" alt="Screenshot" loading="lazy" class="detail-screenshot">
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+  </div>
+
+  <aside class="detail-sidebar">
+
+    <div class="detail-card">
+      <h3>Library</h3>
+      {% if user_status == 'played' %}
+        <p class="status-label status-played">✓ Played</p>
+        <form method="post" action="/library/remove">
+          <input type="hidden" name="game_id" value="{{ game.id }}">
+          <button class="btn btn--surface" type="submit" style="width:100%">Remove</button>
+        </form>
+      {% elif user_status == 'wishlist' %}
+        <p class="status-label status-wishlist">★ On Wishlist</p>
+        <form method="post" action="/library/remove">
+          <input type="hidden" name="game_id" value="{{ game.id }}">
+          <button class="btn btn--surface" type="submit" style="width:100%">Remove</button>
+        </form>
+      {% else %}
+        <form method="post" action="/library/set" style="margin-bottom:0.4rem">
+          <input type="hidden" name="game_id" value="{{ game.id }}">
+          <input type="hidden" name="status" value="played">
+          <button class="btn btn--red" type="submit" style="width:100%">✓ Mark as Played</button>
+        </form>
+        <form method="post" action="/library/set">
+          <input type="hidden" name="game_id" value="{{ game.id }}">
+          <input type="hidden" name="status" value="wishlist">
+          <button class="btn btn--green" type="submit" style="width:100%">+ Add to Wishlist</button>
+        </form>
+      {% endif %}
+    </div>
+
+    <div class="detail-card">
+      <h3>Info</h3>
+      {% if detail.developers %}<div class="detail-info-row"><span>Developer</span><span>{{ detail.developers }}</span></div>{% endif %}
+      {% if detail.publishers %}<div class="detail-info-row"><span>Publisher</span><span>{{ detail.publishers }}</span></div>{% endif %}
+      {% if game.psn_price_eur %}<div class="detail-info-row"><span>Price</span><span class="game-card__price">€{{ "%.2f"|format(game.psn_price_eur) }}</span></div>{% endif %}
+      {% if game.tags %}
+        <div class="detail-tags">
+          {% for tag in game.tags[:12] %}
+            <span class="detail-tag">{{ tag }}</span>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="detail-card detail-links">
+      <h3>Links</h3>
+      {% if game.ign_url %}<a href="{{ game.ign_url }}" class="btn btn--primary" target="_blank" style="width:100%;text-align:center">IGN Review →</a>{% endif %}
+      {% if game.psn_url %}<a href="{{ game.psn_url }}" class="btn btn--surface" target="_blank" style="width:100%;text-align:center">PlayStation Store →</a>{% endif %}
+      {% if detail.website %}<a href="{{ detail.website }}" class="btn btn--surface" target="_blank" style="width:100%;text-align:center">Official Site →</a>{% endif %}
+    </div>
+
+  </aside>
+</div>
+
+{% endblock %}

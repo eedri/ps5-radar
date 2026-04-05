@@ -25,14 +25,16 @@
     {% set score = g.match_score %}
     {% set badge_class = "badge--green" if score >= 80 else "badge--indigo" if score >= 60 else "badge--gray" %}
     <div class="game-card" data-genres="{{ g.genres|join(',') }}" data-score="{{ score }}" data-rating="{{ g.rawg_rating }}" data-price="{{ g.psn_price_eur or 999 }}">
-      {% if g.cover_url %}
-        <img class="game-card__cover" src="{{ g.cover_url }}" alt="{{ g.title }}" loading="lazy">
-      {% else %}
-        <div class="game-card__cover"></div>
-      {% endif %}
+      <a href="/game/{{ g.id }}" class="game-card__cover-link">
+        {% if g.cover_url %}
+          <img class="game-card__cover" src="{{ g.cover_url }}" alt="{{ g.title }}" loading="lazy">
+        {% else %}
+          <div class="game-card__cover"></div>
+        {% endif %}
+      </a>
       <div class="game-card__body">
         <div class="game-card__header">
-          <span class="game-card__title">{{ g.title }}</span>
+          <a href="/game/{{ g.id }}" class="game-card__title-link"><span class="game-card__title">{{ g.title }}</span></a>
           <span class="badge {{ badge_class }}">{{ score }}</span>
         </div>
         <div class="game-card__genres">

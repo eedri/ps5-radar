@@ -38,6 +38,47 @@ async def fetch_game_tags(api_key: str, rawg_id: str) -> list[str]:
             return []
 
 
+async def fetch_game_detail(api_key: str, rawg_id: str) -> dict:
+    """Fetch extended game info: description, trailer, screenshots, developer."""
+    async with httpx.AsyncClient(timeout=15) as client:
+        detail_resp = await client.get(f"{RAWG_BASE}/games/{rawg_id}", params={"key": api_key})
+        detail_resp.raise_for_status()
+        d = detail_resp.json()
+
+        trailer_url = None
+        try:
+            movies_resp = await client.get(f"{RAWG_BASE}/games/{rawg_id}/movies", params={"key": api_key})
+            if movies_resp.status_code == 200:
+                movies = movies_resp.json().get("results", [])
+                if movies:
+                    trailer_url = movies[0]["data"].get("max") or movies[0]["data"].get("480")
+        except httpx.HTTPError:
+            pass
+
+        screenshots = []
+        try:
+            ss_resp = await client.get(f"{RAWG_BASE}/games/{rawg_id}/screenshots", params={"key": api_key})
+            if ss_resp.status_code == 200:
+                screenshots = [s["image"] for s in ss_resp.json().get("results", [])[:4]]
+        except httpx.HTTPError:
+            pass
+
+    developers = ", ".join(dev["name"] for dev in d.get("developers", []))
+    publishers = ", ".join(pub["name"] for pub in d.get("publishers", []))
+
+    return {
+        "description": d.get("description_raw", ""),
+        "trailer_url": trailer_url,
+        "screenshots": screenshots,
+        "website": d.get("website", ""),
+        "developers": developers,
+        "publishers": publishers,
+        "released": d.get("released", ""),
+        "esrb": (d.get("esrb_rating") or {}).get("name", ""),
+        "playtime": d.get("playtime", 0),
+    }
+
+
 async def search_rawg_game(api_key: str, query: str) -> list[dict]:
     """Search RAWG for a game by name. Used for preferences page autocomplete."""
     async with httpx.AsyncClient(timeout=15) as client:
