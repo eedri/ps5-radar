@@ -1,7 +1,7 @@
 import json
 import aiosqlite
-from datetime import datetime, date
-from typing import Optional
+from datetime import date
+from typing import Literal, Optional
 
 async def init_db(db_path: str) -> None:
     async with aiosqlite.connect(db_path) as conn:
@@ -127,7 +127,7 @@ async def get_library(db_path: str) -> dict:
     return {"played": played, "wishlist": wishlist}
 
 
-async def set_user_status(db_path: str, game_id: str, status: str) -> None:
+async def set_user_status(db_path: str, game_id: str, status: Literal["played", "wishlist"]) -> None:
     async with aiosqlite.connect(db_path) as conn:
         await conn.execute("""
             INSERT INTO user_library (game_id, status)
