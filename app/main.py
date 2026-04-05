@@ -1,5 +1,5 @@
 import os
-import sqlite3
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Form, Request
@@ -23,63 +23,8 @@ logging.basicConfig(level=logging.INFO)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
-_DB_INIT_SCRIPT = """
-    CREATE TABLE IF NOT EXISTS games (
-        id TEXT PRIMARY KEY,
-        title TEXT NOT NULL,
-        cover_url TEXT,
-        genres TEXT DEFAULT '[]',
-        tags TEXT DEFAULT '[]',
-        perspective TEXT DEFAULT 'unknown',
-        rawg_rating REAL DEFAULT 0,
-        metacritic INTEGER,
-        psn_price_eur REAL,
-        psn_url TEXT,
-        ign_url TEXT,
-        match_score INTEGER DEFAULT 0,
-        first_seen DATE,
-        last_updated DATE
-    );
-
-    CREATE TABLE IF NOT EXISTS user_library (
-        game_id TEXT PRIMARY KEY,
-        status TEXT NOT NULL CHECK(status IN ('played', 'wishlist')),
-        added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        notes TEXT
-    );
-
-    CREATE TABLE IF NOT EXISTS liked_games (
-        rawg_id TEXT PRIMARY KEY,
-        title TEXT NOT NULL,
-        cover_url TEXT,
-        tags TEXT DEFAULT '[]',
-        added_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS email_log (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        sent_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        games_count INTEGER,
-        top_game_id TEXT,
-        status TEXT DEFAULT 'ok'
-    );
-"""
-
-
-def _init_db_sync(db_path: str) -> None:
-    """Initialize the database synchronously using sqlite3."""
-    with sqlite3.connect(db_path) as conn:
-        conn.executescript(_DB_INIT_SCRIPT)
-        conn.commit()
-
-
 def create_app(db_path: str | None = None) -> FastAPI:
     db = db_path or os.environ.get("DATABASE_URL", "/data/radar.db")
-
-    # In test mode (db_path provided), initialize DB synchronously so it's
-    # ready before the first request, regardless of lifespan event support.
-    if db_path is not None:
-        _init_db_sync(db)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -99,18 +44,17 @@ def create_app(db_path: str | None = None) -> FastAPI:
     async def index(request: Request):
         games = await get_all_games(db, exclude_played=True)
         games = [g for g in games if g["match_score"] >= 20]
-        return templates.TemplateResponse("index.html", {"request": request, "games": games, "selected_genre": "All"})
+        return templates.TemplateResponse(request, "index.html", {"games": games, "selected_genre": "All"})
 
     @app.get("/new", response_class=HTMLResponse)
     async def new_games(request: Request):
         games = await get_new_games(db, days=7)
-        return templates.TemplateResponse("new.html", {"request": request, "games": games})
+        return templates.TemplateResponse(request, "new.html", {"games": games})
 
     @app.get("/library", response_class=HTMLResponse)
     async def library(request: Request):
         data = await get_library(db)
-        return templates.TemplateResponse("library.html", {
-            "request": request,
+        return templates.TemplateResponse(request, "library.html", {
             "played": data["played"],
             "wishlist": data["wishlist"],
         })
@@ -119,8 +63,7 @@ def create_app(db_path: str | None = None) -> FastAPI:
     async def preferences(request: Request):
         liked = await get_liked_games(db)
         weights = build_tag_weights(liked) if liked else {}
-        return templates.TemplateResponse("preferences.html", {
-            "request": request,
+        return templates.TemplateResponse(request, "preferences.html", {
             "liked_games": liked,
             "tag_weights": weights,
         })
