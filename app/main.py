@@ -46,7 +46,11 @@ def create_app(db_path: str | None = None) -> FastAPI:
     async def index(request: Request):
         games = await get_all_games(db, exclude_played=True)
         games = [g for g in games if g["match_score"] >= 20]
-        return templates.TemplateResponse(request, "index.html", {"games": games, "selected_genre": "All"})
+        return templates.TemplateResponse(request, "index.html", {
+            "games": games,
+            "selected_genre": "All",
+            "admin_secret": os.environ.get("ADMIN_SECRET", ""),
+        })
 
     @app.get("/new", response_class=HTMLResponse)
     async def new_games(request: Request):

@@ -4,6 +4,7 @@
 <div class="page-header">
   <h1>PS5 Game Radar</h1>
   <p>{{ games|length }} recommendations · sorted by match score</p>
+  <button class="btn btn--surface refresh-btn" id="refreshBtn" onclick="triggerRefresh()">↻ Refresh Games</button>
 </div>
 
 <div class="filter-bar">
@@ -77,6 +78,28 @@
 {% endif %}
 
 <script>
+async function triggerRefresh() {
+  const btn = document.getElementById('refreshBtn');
+  btn.textContent = '⏳ Refreshing…';
+  btn.disabled = true;
+  try {
+    const res = await fetch('/admin/refresh', {
+      method: 'POST',
+      headers: { 'X-Admin-Secret': '{{ admin_secret }}' },
+    });
+    if (res.ok) {
+      btn.textContent = '✓ Done — reloading…';
+      setTimeout(() => location.reload(), 1000);
+    } else {
+      btn.textContent = '✗ Failed (' + res.status + ')';
+      btn.disabled = false;
+    }
+  } catch (e) {
+    btn.textContent = '✗ Error';
+    btn.disabled = false;
+  }
+}
+
 function filterGenre(genre) {
   document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
   event.target.classList.add('active');
