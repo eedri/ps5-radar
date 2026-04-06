@@ -119,6 +119,7 @@
 
     <div class="detail-card detail-links">
       <h3>Links</h3>
+      <a href="{{ game.title|yt_review }}" class="btn btn--yt" target="_blank" style="width:100%;text-align:center">▶ YouTube — Honest Review</a>
       {% if game.ign_url %}<a href="{{ game.ign_url }}" class="btn btn--primary" target="_blank" style="width:100%;text-align:center">IGN Review →</a>{% endif %}
       {% if game.psn_url %}<a href="{{ game.psn_url }}" class="btn btn--surface" target="_blank" style="width:100%;text-align:center">PlayStation Store →</a>{% endif %}
       {% if detail.website %}<a href="{{ detail.website }}" class="btn btn--surface" target="_blank" style="width:100%;text-align:center">Official Site →</a>{% endif %}

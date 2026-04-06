@@ -1,6 +1,7 @@
 import os
 import logging
 from contextlib import asynccontextmanager
+from urllib.parse import quote_plus
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -24,6 +25,9 @@ logging.basicConfig(level=logging.INFO)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
+templates.env.filters["yt_review"] = lambda title: (
+    "https://www.youtube.com/results?search_query=" + quote_plus(title + " honest review")
+)
 
 def create_app(db_path: str | None = None) -> FastAPI:
     db = db_path or os.environ.get("DATABASE_URL", "/data/radar.db")

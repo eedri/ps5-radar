@@ -64,6 +64,7 @@ main { max-width: 1200px; margin: 0 auto; padding: 1.25rem; }
 .btn--red { background: #3a1e1e; color: #f87171; }
 .btn--love { background: #3a1e2e; color: #f9a8d4; }
 .btn--love--active { background: #6b2145; color: #fce7f3; cursor: default; }
+.btn--yt { background: #3a1a1a; color: #f87171; }
 .game-card__actions { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: auto; padding-top: 0.5rem; border-top: 1px solid var(--surface2); }
 
 /* DETAIL PAGE */
