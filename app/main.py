@@ -46,10 +46,15 @@ def create_app(db_path: str | None = None) -> FastAPI:
 
     # ── Pages ──────────────────────────────────────────────────────────────
 
+    FPS_TAGS = {"fps", "first-person-shooter"}
+
     @app.get("/", response_class=HTMLResponse)
     async def index(request: Request):
         games = await get_all_games(db, exclude_played=True)
-        games = [g for g in games if g["match_score"] >= 20]
+        games = [
+            g for g in games
+            if g["match_score"] >= 20 and not FPS_TAGS.intersection(g.get("tags", []))
+        ]
         liked = await get_liked_games(db)
         liked_ids = {g["rawg_id"] for g in liked}
         return templates.TemplateResponse(request, "index.html", {
