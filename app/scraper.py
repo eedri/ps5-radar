@@ -159,4 +159,5 @@ def _normalize_rawg_game(r: dict) -> dict:
         "psn_url": build_psn_url(slug),
         "ign_url": build_ign_url(slug),
         "match_score": 0,
+        "released": r.get("released"),  # YYYY-MM-DD or None for TBA
     }

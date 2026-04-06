@@ -94,6 +94,13 @@
           <button class="btn btn--green" type="submit" style="width:100%">+ Add to Wishlist</button>
         </form>
       {% endif %}
+      <hr style="border-color: var(--surface2); margin: 0.25rem 0;">
+      {% if is_liked %}
+        <button class="btn btn--love btn--love--active" disabled style="width:100%">♥ Loved</button>
+      {% else %}
+        <button class="btn btn--love" style="width:100%"
+                onclick="loveGame('{{ game.id }}', {{ game.title|tojson }}, '{{ game.cover_url }}', this)">♥ Love this game</button>
+      {% endif %}
     </div>
 
     <div class="detail-card">
@@ -120,4 +127,27 @@
   </aside>
 </div>
 
+<script>
+async function loveGame(rawgId, title, coverUrl, btn) {
+  btn.disabled = true;
+  btn.textContent = '♥ Saving…';
+  try {
+    const res = await fetch('/preferences/add', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({rawg_id: rawgId, title: title, cover_url: coverUrl}),
+    });
+    if (res.ok) {
+      btn.textContent = '♥ Loved';
+      btn.classList.add('btn--love--active');
+    } else {
+      btn.textContent = '♥ Love this game';
+      btn.disabled = false;
+    }
+  } catch {
+    btn.textContent = '♥ Love this game';
+    btn.disabled = false;
+  }
+}
+</script>
 {% endblock %}

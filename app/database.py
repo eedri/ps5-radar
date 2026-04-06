@@ -19,6 +19,7 @@ async def init_db(db_path: str) -> None:
                 psn_url TEXT,
                 ign_url TEXT,
                 match_score INTEGER DEFAULT 0,
+                released DATE,
                 first_seen DATE,
                 last_updated DATE
             );
@@ -46,6 +47,10 @@ async def init_db(db_path: str) -> None:
                 status TEXT DEFAULT 'ok'
             );
         """)
+        try:
+            await conn.execute("ALTER TABLE games ADD COLUMN released DATE")
+        except Exception:
+            pass  # column already exists
         await conn.commit()
 
 
@@ -55,8 +60,8 @@ async def upsert_game(db_path: str, game: dict) -> None:
         await conn.execute("""
             INSERT INTO games (id, title, cover_url, genres, tags, perspective,
                 rawg_rating, metacritic, psn_price_eur, psn_url, ign_url,
-                match_score, first_seen, last_updated)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                match_score, released, first_seen, last_updated)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 title=excluded.title,
                 cover_url=excluded.cover_url,
@@ -69,6 +74,7 @@ async def upsert_game(db_path: str, game: dict) -> None:
                 psn_url=excluded.psn_url,
                 ign_url=excluded.ign_url,
                 match_score=excluded.match_score,
+                released=excluded.released,
                 last_updated=excluded.last_updated
         """, (
             game["id"], game["title"], game.get("cover_url", ""),
@@ -76,7 +82,7 @@ async def upsert_game(db_path: str, game: dict) -> None:
             game.get("perspective", "unknown"), game.get("rawg_rating", 0),
             game.get("metacritic"), game.get("psn_price_eur"),
             game.get("psn_url", ""), game.get("ign_url", ""),
-            game.get("match_score", 0), today, today,
+            game.get("match_score", 0), game.get("released"), today, today,
         ))
         await conn.commit()
 
@@ -87,13 +93,16 @@ async def get_all_games(db_path: str, exclude_played: bool = False) -> list[dict
         if exclude_played:
             cursor = await conn.execute("""
                 SELECT g.* FROM games g
-                WHERE g.id NOT IN (
+                WHERE (g.released IS NULL OR g.released <= date('now'))
+                  AND g.id NOT IN (
                     SELECT game_id FROM user_library WHERE status = 'played'
-                )
+                  )
                 ORDER BY match_score DESC
             """)
         else:
-            cursor = await conn.execute("SELECT * FROM games ORDER BY match_score DESC")
+            cursor = await conn.execute(
+                "SELECT * FROM games WHERE (released IS NULL OR released <= date('now')) ORDER BY match_score DESC"
+            )
         rows = await cursor.fetchall()
     return [_row_to_dict(row) for row in rows]
 

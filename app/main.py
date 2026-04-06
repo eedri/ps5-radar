@@ -46,10 +46,13 @@ def create_app(db_path: str | None = None) -> FastAPI:
     async def index(request: Request):
         games = await get_all_games(db, exclude_played=True)
         games = [g for g in games if g["match_score"] >= 20]
+        liked = await get_liked_games(db)
+        liked_ids = {g["rawg_id"] for g in liked}
         return templates.TemplateResponse(request, "index.html", {
             "games": games,
             "selected_genre": "All",
             "admin_secret": os.environ.get("ADMIN_SECRET", ""),
+            "liked_ids": liked_ids,
         })
 
     @app.get("/new", response_class=HTMLResponse)
@@ -83,10 +86,13 @@ def create_app(db_path: str | None = None) -> FastAPI:
         api_key = os.environ.get("RAWG_API_KEY", "")
         detail = await fetch_game_detail(api_key, game_id)
         user_status = await get_user_status(db, game_id)
+        liked = await get_liked_games(db)
+        liked_ids = {g["rawg_id"] for g in liked}
         return templates.TemplateResponse(request, "game.html", {
             "game": game,
             "detail": detail,
             "user_status": user_status,
+            "is_liked": game_id in liked_ids,
         })
 
     # ── Library actions ────────────────────────────────────────────────────
